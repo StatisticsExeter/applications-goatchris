@@ -8,14 +8,14 @@ import plotly.express as px
 def plot_scatter(df, x_name, y_name):
     """Given a dataframe containing numeric columns specified by x_name and y_name
     return a plotly express scatterplot"""
-    fig = px. scatter(df, x = x_name, y = y_name)
+    fig = px. scatter(df, x=x_name, y=y_name)
     return fig
 
 
 def calculate_correlation(df, x1, x2):
     """Given a dataframe containing numeric columns specified by x_name and y_name
-    return two objects (numbers), the first is the pearson correlation coefficient, the second 
-    the significance of this estimate"""
+    return two objects (numbers), the first is the pearson correlation coefficient,
+    the second the significance of this estimate"""
     corr, p_value = pearsonr(df[x1], df[x2])
     return corr, p_value
 
@@ -25,7 +25,7 @@ def fit_regression(df, x_name, y_name):
     return the stats models OLS fit of a regression model of y on x"""
     X = sm.add_constant(df[[x_name]])
     y = df[y_name]
-    model = sm.OLS(y,X).fit()
+    model = sm.OLS(y, X).fit()
     return model
 
 
