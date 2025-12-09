@@ -4,9 +4,15 @@ from course.utils import find_project_root
 
 
 def metric_report(y_test_path, y_pred_path, report_path):
-    y_test = pd.read_csv(y_test_path)
-    y_pred = pd.read_csv(y_pred_path)
+    # Read as Series
+    y_test = pd.read_csv(y_test_path).squeeze()
+    y_pred = pd.read_csv(y_pred_path).squeeze()
     """Create a pandas data frame called report which contains your classifier results"""
+    # Build classification report as a DataFrame
+    report_dict = classification_report(y_test, y_pred, output_dict=True)
+    report = pd.DataFrame(report_dict)
+
+    # Transpose and save
     report.transpose().to_csv(report_path, index=True)
 
 
