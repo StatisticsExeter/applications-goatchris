@@ -1,6 +1,6 @@
 ---
 title: "Understanding costs"
-author: "Anonymous"
+author: "Chris Chiu"
 format: 
   html:
     embed-resources: true
@@ -10,9 +10,12 @@ format:
 
 
 
-## Your task
+## Introduction
 
-This material is provided as context to the problem. You should rewrite it as you see fit.
+Understanding variation in residential carbon emissions across local authorities is essential for designing effective environmental policy. However, not all areas are comparable. Authorities differ in the age of their housing stock and the distribution of property sizes, two factors strongly associated with carbon emissions. Older houses typically perform worse energetically, and larger homes naturally generate higher emissions. Any attempt to compare performance across authorities must therefore adjust for these structural differences.
+
+In this coursework, we conduct an aggregate level analysis where each observation represents a local authority. For each authority, we consider the average CO₂ emissions for properties grouped by age (pre-1930 vs post-1930) and by number of heated rooms (1–10). A mixed effects model is then used to adjust for these structural variables and estimate authority specific deviations from expected performance.
+
 
 ## The Problem
 
@@ -43,14 +46,20 @@ Where
 
 Some initial exploratory data analysis shows us how the carbon emissions vary by age of property and by the number of rooms:
 
-
-
 ![](../../data_cache/vignettes/regression/boxplot_age.html){width="100%" height="600px"}
+
+
+The boxplot demonstrates a clear difference between older and newer properties. Pre-1930 houses tend to have higher emissions, reflecting poorer insulation and less efficient building design. This supports the inclusion of an “old” indicator variable in the model.
 
 ![](../../data_cache/vignettes/regression/boxplot_rooms.html){width="100%" height="600px"}
 
 
-## The model
+Carbon emissions also increase systematically with room count. As expected, larger properties require more heating and often have greater heat loss surfaces. This confirms the appropriateness of including room categories as fixed effects.
+
+Collectively, these plots show that variation in emissions across authorities cannot be interpreted without first adjusting for age and size of housing.
+
+
+## The Model
 
 A model can be fitted and a summary of the fixed effects produced
 
@@ -64,31 +73,52 @@ with open('../../data_cache/vignettes/regression/model_fit.txt') as f:
     print(content)
 ```
 
+After fitting the model, the fixed-effect estimates behave in a reasonable and interpretable way.
 
-## The key insight
+The coefficient associated with the pre-1930 indicator is positive, reflecting the well established fact that older properties generally have poorer thermal performance and therefore higher carbon emissions.
+A similar pattern is visible in the coefficients for the number of heated rooms, as property size increases, the predicted emissions also rise.
+This increasing trend aligns with physical intuition, since larger homes require more energy to heat and often suffer greater heat loss.
+Taken together, these fixed effect results suggest that the model is successfully adjusting for the major structural factors that differentiate one local authority from another.
+
+
+## The Key Insight
 
 We've been asked to rate local authority performance, so the most important result is a ``caterpillar plot'' of the random effects.
 
 
 ![](../../data_cache/vignettes/regression/caterpillar.html){width="100%" height="600px"}
 
-##  Additional credit
 
-For additional credit you might like to enhance the exploratory data analysis. You could consider residual diagnostics to check the validity of the model fit. You may also like to consider the appropriateness of the adjusting variables age and number of rooms. You could consider extracting further variables from the database and fitting a slightly more elaborate model.
+This plot ranks authorities from lowest to highest adjusted emissions. Authorities on the left of the plot have lower-than-expected emissions, even after adjusting for housing stock composition. These may reflect better insulation programmes, modern heating systems, or effective local policy.
+
+Authorities on the right have higher-than-expected emissions, suggesting room for targeted intervention or structural disadvantages not captured by the model.
+
+The 95% intervals provide a measure of uncertainty. Only authorities whose intervals do not cross zero can be confidently classified as significantly better or worse.
+
+This ranking forms the main analytical output required by the client: a fair, adjusted comparison across authorities.
 
 
-## Record of AI use for MTHM503 Regression coursework
+
+##  Additional Credit
+
+The analysis can be extended in several ways to strengthen the reliability of the model and deepen the interpretation. A natural first step is to examine residual diagnostics. Plotting residuals against fitted values would allow assessment of heteroscedasticity and potential non-linearity, while a normal Q–Q plot would indicate whether the Gaussian assumption for the random effects is reasonable. These checks help ensure that the reported authority rankings are not driven by violations of model assumptions.
+
+Further refinements could be achieved by expanding the set of adjusting variables. The EPC dataset contains numerous structural and thermal features, such as insulation type, heating fuel, wall construction and glazing, that influence CO₂ emissions independently of age and room count. Incorporating a small number of these variables would allow a more sensitive adjustment and could reduce unexplained variance attributed to the authority level random effects.
+
+Another extension is to recognise that authorities are not independent spatial units. Neighbouring areas often share historical building patterns, climate conditions and policy environments. A spatial correlation structure or conditional autoregressive (CAR) model could account for these dependencies and prevent overestimation of precision for geographically clustered authorities.
+
+These extensions go beyond the core brief but demonstrate how the modelling framework could be expanded into a more comprehensive assessment of structural and spatial variation in emissions.
+
+
+## Record of AI Use for MTHM503 Regression Coursework
 
 Instructions: You can use this document to record when, how and why you used GenAI to complete your assessment. It will help you create a record of AI use to submit alongside your references for AI-integrated and AI-assisted assignments. It may also be useful to help you discuss your AI use if you are required to do so in an academic conduct meeting.
 
-| **Date**       | **AI tool used** | **Purpose**                                | **Prompt**                                 | **Hyperlink to output (where possible)** | **Section of work used for** |
-|----------------|------------------|--------------------------------------------|--------------------------------------------|------------------------------------------|-------------------------------|
-| E.g. 15/07/2025| MS Copilot       | To help create an organised essay structure| ‘Generate ideas for structuring an essay on...’ | [insert link]                          | introduction                  |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
+| **Date** | **AI tool used** | **Purpose** | **Prompt** | **Section of work used for** |
+|----------|----------|----------------|--------------------|--------------------|
+| E.g. 15/07/2025 | MS Copilot | To help create an organised essay structure | ‘Generate ideas for structuring an essay on...’ | introduction |
+| 9/12/2025 | ChatGPT | Grammar and spell check | Please check my grammar and spelling. Feel free to reorder my sentence structure | Introduction, The Data, The model, The key insight, Additional credit |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |

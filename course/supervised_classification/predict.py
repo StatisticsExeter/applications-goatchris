@@ -7,27 +7,14 @@ def predict(model_path, X_test_path, y_pred_path, y_pred_prob_path):
     model = joblib.load(model_path)
     X_test = pd.read_csv(X_test_path)
     """Form an object y_pred containing a list of your classifer predictions"""
-    # Predictions
     y_pred = model.predict(X_test)
-    y_pred_df = pd.DataFrame({"predicted_built_age": y_pred})
-    y_pred_df.to_csv(y_pred_path, index=False)
-
-    y_scores = None
-
-    if hasattr(model, "predict_proba"):
-        proba = model.predict_proba(X_test)
-        if proba.ndim == 2 and proba.shape[1] >= 2:
-            y_scores = proba[:, 1]
-        else:
-            y_scores = proba.ravel()
-    elif hasattr(model, "decision_function"):
-        scores = model.decision_function(X_test)
-        y_scores = scores if scores.ndim == 1 else scores[:, 0]
-    else:
-        y_scores = [0.5] * len(y_pred)
-
-    y_pred_prob_df = pd.DataFrame({"predicted_built_age": y_scores})
-    y_pred_prob_df.to_csv(y_pred_prob_path, index=False)
+    y_pred_series = pd.Series(y_pred, name='predicted_built_age')
+    y_pred_series.to_csv(y_pred_path, index=False)
+    """Form an object y_pred_prob containing a list of
+    the probability of your classier predictions"""
+    y_pred_prob = model.predict_proba(X_test)[:, 1]
+    y_pred_prob_series = pd.Series(y_pred_prob, name='predicted_built_age')
+    y_pred_prob_series.to_csv(y_pred_prob_path, index=False)
 
 
 def pred_lda():

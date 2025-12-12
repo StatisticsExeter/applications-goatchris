@@ -1,50 +1,45 @@
 ---
 title: "Building a classifier to predicting house age"
-author: "Anonymous"
+author: "Chris Chiu"
 format: 
-  html:
+  html: 
     embed-resources: true
-
 ---
 
-## Your task
+## Introduction
 
-This material is provided as context to the problem. You should rewrite it as you see fit.
+Energy Performance Certificates (EPCs) provide a consistent record of energy related characteristics across UK housing. For local authorities planning targeted retrofit programmes, a key question is whether basic EPC metrics can reliably distinguish older pre-1930s homes from more modern construction. Because older properties typically exhibit lower fabric performance and higher energy costs, this study evaluates whether routinely collected EPC variables are sufficient to classify properties into pre and post-1930 groups using simple supervised learning models.
+
 
 ## The Problem
 
 Data on [Energy Certificates](https://epc.opendatacommunities.org/) were downloaded in March 2025. These certificates are a non-random sample of UK housing, and contain information such as:
 
-- Property energy efficiency: The core data is the energy efficiency rating, which ranges from A (most efficient) to G (least efficient).
-- CO2 emissions: The data includes information on the building's likely carbon dioxide emissions.
-- Energy costs: Potential costs for heating and lighting the property are provided.
-- Improvement recommendations: Each EPC lists cost-effective ways to improve the building's energy performance.
+-   Property energy efficiency: The core data is the energy efficiency rating, which ranges from A (most efficient) to G (least efficient).
+-   CO2 emissions: The data includes information on the building's likely carbon dioxide emissions.
+-   Energy costs: Potential costs for heating and lighting the property are provided.
+-   Improvement recommendations: Each EPC lists cost-effective ways to improve the building's energy performance.
 
 In all, there are 93 variables available on a wide range of metrics. The full dataset is in the course database server at `10.121.4.250` in `energy.energy_certificates`
 
 The data have been used for various published supervised classification exercises:
 
-- ONS data science campus EPC data to predict energy efficiency ratings across Welsh properties. They applied models like XGBoost and found that features such as floor area, number of habitable rooms, and extension count were most predictive <https://datasciencecampus.ons.gov.uk/projects/using-machine-learning-to-predict-energy-efficiency/>
-- EPC anomaly detection (improve data quality) <https://www.iaarc.org/publications/fulltext/102_A_Comprehensive_Approach_for_Automated_Anomaly_Detection_and_Enhancement_of_EPC_Datasets_for_Decarbonization.pdf>
-- Identifying priorities for retrofit strategy <https://uwlpress.uwl.ac.uk/newvistas/article/id/299/>
-- EPC prediction <https://github.com/yourunclefrankie/Energy-efficiency-prediction>
+-   ONS data science campus EPC data to predict energy efficiency ratings across Welsh properties. They applied models like XGBoost and found that features such as floor area, number of habitable rooms, and extension count were most predictive <https://datasciencecampus.ons.gov.uk/projects/using-machine-learning-to-predict-energy-efficiency/>
+-   EPC anomaly detection (improve data quality) <https://www.iaarc.org/publications/fulltext/102_A_Comprehensive_Approach_for_Automated_Anomaly_Detection_and_Enhancement_of_EPC_Datasets_for_Decarbonization.pdf>
+-   Identifying priorities for retrofit strategy <https://uwlpress.uwl.ac.uk/newvistas/article/id/299/>
+-   EPC prediction <https://github.com/yourunclefrankie/Energy-efficiency-prediction>
 
-In reducing the carbon footprint of UK housing, it is important to develop a strategy that offers the right solutions to the right properties. It is widely believed that houses build before 1930 require very different approaches to houses built after that period.  In this task, you are required to determine whether it is possible to determine the age of a house based on several recorded energy metrics. These are `current_energy_efficiency`, `environment_impact_current`, `energy_consumption_current`, `co2_emissions_current`, `lighting_cost_current`, `heating_cost_current`, `hot_water_cost_current`.  You have data for all certificates issued in a single local authority area.  This would help the local authority identify the right targets just using metrics rather than requiring a visit to the property to determine its age.
-
-
+Reducing the carbon footprint of UK housing requires identifying which types of properties are most in need of intervention. A key distinction is whether a dwelling was built before 1930, as older properties typically exhibit very different energy characteristics. This analysis investigates whether the age category of a property can be predicted using routinely recorded EPC metrics, including energy efficiency, environmental impact, energy consumption and cost-related measures. The dataset contains all certificates issued within a single local authority, allowing us to assess whether these features are sufficient to distinguish between older and more modern housing without the need for a physical inspection.
 
 
 ## The Data
 
-A very simple preview of the data is given below:
+We begin by inspecting the distribution of the groups. Table 1 shows the frequency of each category:
 
 ```{python}
 #| echo: false
 import pandas as pd
 ```
-
-And a clumsy presentation of some group summary statistics:
-
 
 ```{python}
 #| echo: false
@@ -53,7 +48,7 @@ df = pd.read_csv('../../data_cache/vignettes/supervised_classification/frequenci
 print(df.round(3).to_markdown(index=False))
 ```
 
-
+Summary statistics for each group are shown in Table 2:
 
 ```{python}
 #| echo: false
@@ -62,20 +57,76 @@ df = pd.read_csv('../../data_cache/vignettes/supervised_classification/grouped_s
 print(df.round(3).to_markdown(index=False))
 ```
 
-It is always useful to view a scatterplot of the data, marking the two known groups
-
+A scatter plot of `current_energy_efficiency` against `environment_impact_current` (Figure 1) illustrates clear trends between energy efficiency and environmental impact, with points coloured by built age:
 
 ![](../../data_cache/vignettes/supervised_classification/scatterplot.html){width="100%" height="600px"}
 
+Post-1930 properties (red) concentrate at higher efficiency and environmental impact values, whereas pre-1930 homes display greater variability and more low efficiency outliers. Although the two groups overlap substantially, the visible shift in their distributions indicates that meaningful classification based on these energy-performance metrics should still be achievable.
+
+To better understand the structure of the data, I examined the class balance and the relationships among the seven energy-related predictors.
+
+```{python}
+#| echo: false
+#| results: 'asis'
+df = pd.read_csv('../../data_cache/energy.csv')
+counts = df['built_age'].value_counts().rename('Count')
+props = df['built_age'].value_counts(normalize=True).rename('Proportion')
+class_balance = pd.concat([counts, props], axis=1)
+print(class_balance.round(3).to_markdown())
+```
+
+The class distribution is moderately imbalanced, with post-1930 properties forming the majority of observations. This is important when interpreting classification performance, as a naïve classifier that always predicts the majority class would already achieve non trivial accuracy. Any model must therefore be compared against this baseline rather than against a balanced 50/50 scenario.
+
+```{python}
+#| echo: false
+import plotly.express as px
+
+numeric_cols = [
+'current_energy_efficiency',
+'environment_impact_current',
+'energy_consumption_current',
+'co2_emissions_current',
+'lighting_cost_current',
+'heating_cost_current',
+'hot_water_cost_current'
+]
+
+corr = df[numeric_cols].corr()
+fig = px.imshow(
+corr.round(2),
+text_auto=True,
+aspect="auto",
+zmin=-1, zmax=1,
+title="Correlation matrix of energy-performance variables"
+)
+fig
+```
+
+The correlation matrix reveals strong positive relationships among the consumption and cost related variables, alongside negative correlations with current energy efficiency. This pattern indicates that the seven metrics reflect a shared underlying dimension of energy performance, while still providing enough independent variation to contribute useful information to the classifier.
+
+Model evaluation shows that recall is higher for post-1930 properties than for pre-1930 ones, implying that older homes display more heterogeneous energy behaviour and therefore present a greater challenge for accurate classification.
+
+```{python}
+#| echo: false
+#| results: 'asis'
+y_test = pd.read_csv('../../data_cache/energy_y_test.csv').squeeze()
+y_pred_lda = pd.read_csv('../../data_cache/models/lda_y_pred.csv').squeeze()
+
+cm = pd.crosstab(
+y_test,
+y_pred_lda,
+rownames=['True built_age'],
+colnames=['Predicted built_age']
+)
+print(cm.to_markdown())
+```
+
+The confusion matrix indicates that LDA reliably identifies both age groups, with misclassifications concentrated almost entirely in pre-1930 dwellings. This asymmetry reflects higher within class variance for older properties, consistent with their heterogeneous construction characteristics. Errors align with the observed overlap in the feature space, suggesting that misclassification is driven by intrinsic ambiguity rather than model deficiency. Overall, the matrix confirms discriminative performance well above the majority class baseline.
 
 
-For more marks, you may wish to extend this EDA section slightly.  We can extract the performance metrics from fitting such models:
+## Fitting LDA and QDA Classifiers
 
-
-## Fitting LDA and QDA classifiers
-
-The simplest classifiers we could apply are Linear and Quadratic Discriminant analysis.
-
+LDA and QDA were fitted as baseline classifiers to assess whether linear or mildly non-linear boundaries improve discrimination between pre- and post-1930 properties.
 
 ```{python}
 #| echo: false
@@ -85,7 +136,7 @@ df.rename(columns={"Unnamed: 0": "Category"}, inplace=True)
 print(df.round(3).to_markdown(index=False))
 ```
 
-### Results from fitting a quadratic discriminant analysis
+### Results from Fitting a Quadratic Discriminant Analysis
 
 ```{python}
 #| echo: false
@@ -95,37 +146,35 @@ df.rename(columns={"Unnamed: 0": "Category"}, inplace=True)
 print(df.round(3).to_markdown(index=False))
 ```
 
-You should comment on these results. You may wish to add an interpretation of the coefficients of these classifiers.  Or there may be other metrics (confusion matrix) that you think should be presented.
+Both models deliver similar performance across precision, recall and F1, indicating that allowing class specific covariance structures offers little practical benefit here. This suggests that the separation between the two age groups is approximately linear in the energy performance variables. A confusion matrix confirms that misclassification arises mainly in borderline cases where the energy metrics overlap, rather than from systematic bias toward either class.
 
 
-## ROC curve (and AUC) for two simple classifiers
+## ROC Curve (and AUC) for Two Simple Classifiers
 
-We can of course examine the AUC for these classifiers.
-
+The ROC curves for the two classifiers are presented in Figure 2:
 
 ![](../../data_cache/vignettes/supervised_classification/roc.html){width="100%" height="600px"}
 
-
-You should comment on the performance of the classifier.
-
-##  Additional credit
-
-For additional credit you should consider extended the pipeline and trying out other classifiers.
+LDA attains an AUC of around 0.81, slightly higher than QDA at 0.79, both well above the 0.50 baseline expected from random classification. This indicates that the energy performance variables provide strong discriminatory information about property age. The LDA curve remains marginally superior across most false positive rates, implying that a linear decision boundary is already adequate for this task and that the additional flexibility of QDA offers limited practical improvement.
 
 
-## Record of AI use for MTHM503 supervised coursework
+## Additional Credit
+
+Although the pipeline focuses on LDA and QDA, it could be extended to include other supervised classifiers. A natural next step would be logistic regression, which retains interpretability while providing a probabilistic linear boundary. Decision trees or random forests could capture non-linear interactions between the energy variables, and an SVM with a radial kernel would allow more flexible separation when the classes overlap.
+
+Conceptually, these models would simply plug into the existing workflow: train on `energy_X_train.csv`, generate predictions on `energy_X_test.csv`, save outputs to the `models/` folder, and compute performance metrics in the same way as for LDA and QDA. Comparing their AUC and confusion matrices would reveal whether additional model complexity yields meaningful improvements over the linear discriminant approach.
+
+
+## Record of AI Use for MTHM503 Supervised Coursework
 
 Instructions: You can use this document to record when, how and why you used GenAI to complete your assessment. It will help you create a record of AI use to submit alongside your references for AI-integrated and AI-assisted assignments. It may also be useful to help you discuss your AI use if you are required to do so in an academic conduct meeting.
 
-| **Date**       | **AI tool used** | **Purpose**                                | **Prompt**                                 | **Hyperlink to output (where possible)** | **Section of work used for** |
-|----------------|------------------|--------------------------------------------|--------------------------------------------|------------------------------------------|-------------------------------|
-| E.g. 15/07/2025| MS Copilot       | To help create an organised essay structure| ‘Generate ideas for structuring an essay on...’ | [insert link]                          | introduction                  |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-
+| **Date** | **AI tool used** | **Purpose** | **Prompt** | **Section of work used for** |
+|---------------|---------------|---------------|---------------|---------------|
+| E.g. 15/07/2025 | MS Copilot | To help create an organised essay structure | ‘Generate ideas for structuring an essay on...’ | introduction |
+| 9/12/2025 | ChatGPT | Grammar and spell check | Please check my grammar and spelling. Feel free to reorder my sentence structure | Introduction, The Data, Fitting LDA and QDA classifiers, Results from fitting a quadratic discriminant analysis, ROC curve (and AUC) for two simple classifiers, Additional credit |
+| 9/12/2025 | ChatGPT | Code assisting | How to make the graph more readable? | corr.round(2) |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |

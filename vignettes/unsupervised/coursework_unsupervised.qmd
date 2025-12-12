@@ -1,15 +1,15 @@
 ---
 title: "Clustering local authorities by road collision patterns"
-author: "Anonymous"
+author: "Chris Chiu"
 format: 
   html:
     embed-resources: true
 
 ---
 
-## Your task
+## Introduction
 
-This material is provided as context to the problem. You should rewrite it as you see fit.  IN particular, you should demonstrate you understand why we are undertaking a cluster analysis, and what the various methods are telling us.  In particular, you should explain how principal components helps us visualise the results of the clustering.
+Understanding patterns in road traffic collisions is essential for designing targeted safety interventions. Local authorities often differ substantially in geography, infrastructure, and driving conditions, meaning that the types of collisions they experience may follow distinct profiles. Unsupervised learning provides a natural tool for identifying such latent structure because it groups local authorities based purely on observed collision characteristics, without requiring predefined labels.
 
 
 ## The Problem
@@ -45,7 +45,7 @@ Police recorded data in Great Britain is called "Stats19" and is available at <h
 These tables are linked via a unique accident index.
 
 
-We are interested in creating clusters of like authorities based on the kinds of collisions that occur in their area.  You have been given a count of the number of collisions at Mini-roundabout, in the Rain, in the Dark, when the road is Dry, in an urban setting and where the most seriously injured casualty was reported as having a slight injury.
+We are interested in creating clusters of like authorities based on the kinds of collisions that occur in their area.
 
 Some previous cluster analysis work has been reported at:
 
@@ -59,30 +59,39 @@ The first thing we can do is consider a scatterplot of the data
 
 ![](../../data_cache/vignettes/unsupervised_classification/scatterplot.html){width="100%" height="600px"}
 
-We are going to use the proportion of each subtype of collision that was reported, and rescale the variables.
+
+Although each point represents an entire local authority, the plot displays no obvious grouping in the raw feature space. This is common in multidimensional data. Meaningful separation may exist only when considering combinations of variables rather than individual pairs. This motivates the use of PCA and clustering methods, and the lack of visible structure in the raw plot already foreshadows the importance of dimensionality reduction.
 
 
-## Hierarchical clustering
+## Hierarchical Clustering
 
-
-The first task is to perform hierarchical clustering.
+Hierarchical clustering builds a tree (dendrogram) that illustrates how authorities progressively merge into larger groups as the distance threshold increases.
 
 ![](../../data_cache/vignettes/unsupervised_classification/dendrogram.html){width="100%" height="600px"}
 
 
-You need to select a suitable ``cut-point'' and cut the tree at an appropriate height to form a number of clusters.
+**Selecting a cut-point**
 
-To aid visualisation of results, you should plot the cluster membership on a scatterplot of the first two principal components.
+From the dendrogram, a clear separation occurs around height 7–8, where the branches split into three major groups. Cutting at this level provides a meaningful balance between detail and interpretability: cutting lower would produce many small and unstable clusters, while cutting much higher (around 12–14) would merge distinct accident profiles into only two broad groups. The height around 7–8 therefore represents the most natural division of local authorities based on their collision characteristics.
+
+**Visualising the clusters with principal components**
+
+Once the cut height was chosen, the resulting cluster memberships were projected onto the first two principal components. PC1 captures the main variation in collision patterns across authorities, while PC2 reflects secondary contrasts, such as differences between urban and rural accident profiles. The resulting scatterplot shows that the clusters identified by hierarchical clustering form visibly distinct regions in the reduced PCA space, confirming that the chosen cut-point produces groups with genuinely different collision behaviours. PCA is essential here because it allows us to visualise structure that is otherwise hidden in the original six-dimensional dataset.
+
+To interpret the clusters, we project the data onto the first two principal components and colour points by cluster membership:
 
 
 ![](../../data_cache/vignettes/unsupervised_classification/kscatter.html){width="100%" height="600px"}
 
 
-## kmeans clustering
+The PCA scatterplot provides a clear two-dimensional summary of the clustering results. By projecting the six correlated collision measures onto the first two principal components, most meaningful variation is retained while noise is reduced. The resulting geometry reveals three well-separated regions, indicating systematic differences in collision profiles across authorities. This confirms that the clusters reflect genuine structure rather than artefacts of the algorithm, and illustrates how PCA clarifies contrasts that are not visible in the raw feature space.
 
 
-The second task is to perform k-means clustering. You should select an appropriate number of clusters.
-First, you should look at the cluster centroids:
+## Kmeans Clustering
+
+After standardising the variables, k-means was applied to identify groups of local authorities with similar collision profiles.
+
+First, we examine cluster centroids (after scaling variables):
 
 
 ![](../../data_cache/vignettes/unsupervised_classification/kcentroids1.html){width="100%" height="600px"}
@@ -91,35 +100,76 @@ First, you should look at the cluster centroids:
 ![](../../data_cache/vignettes/unsupervised_classification/kcentroids2.html){width="100%" height="600px"}
 
 
-As before you should plot the cluster membership on a scatterplot of the first two principal components.
+Even on the original scale, the centroids show distinct behavioural signatures. One cluster is characterised by substantially higher overall collision volumes, while others differ mainly in the composition of collisions. For example, whether incidents occur predominantly in urban areas, in the dark, or in wet conditions. These contrasts indicate that the clusters are not arbitrary: they capture meaningful variation in exposure and road environment.
+
+To visualise this structure, the cluster assignments were projected onto the first two principal components:
 
 ![](../../data_cache/vignettes/unsupervised_classification/kscatter.html){width="100%" height="600px"}
 
 
+The PCA plot shows compact, well separated clusters, confirming that k-means is identifying stable groupings in a lower-dimensional space. PC1 primarily reflects overall collision intensity, while PC2 captures contextual differences such as urbanisation or lighting conditions. The alignment between the PCA geometry and the k-means partitions demonstrates that the clustering is not driven by noise but by coherent underlying patterns.
 
 
+##  Additional Credit
 
-##  Additional credit
+To complement the hierarchical and k-means approaches, an additional unsupervised method was considered.
 
-For additional credit you should consider adding a further unsupervised classification method. Alternatively, you could increase the number of variables used in the clustering.
+```{python}
+#| echo: false
+#| results: "hide"
+import pandas as pd
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import plotly.express as px
+
+# Load the same dataset used for hierarchical + kmeans
+df = pd.read_csv("../../data_cache/la_collision.csv")
+
+X = df.select_dtypes(include="number")
+
+# Standardise
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Fit DBSCAN
+db = DBSCAN(eps=0.8, min_samples=5)
+labels = db.fit_predict(X_scaled)
+df["dbscan_cluster"] = labels
+
+# PCA for plotting
+pca = PCA(n_components=2)
+pcs = pca.fit_transform(X_scaled)
+df["PC1"] = pcs[:, 0]
+df["PC2"] = pcs[:, 1]
+
+# Plot
+fig = px.scatter(
+    df,
+    x="PC1",
+    y="PC2",
+    color="dbscan_cluster",
+    title="DBSCAN cluster assignments in PCA space",
+    labels={"dbscan_cluster": "Cluster"},
+)
+fig
+```
+
+Density-Based Spatial Clustering (DBSCAN) was chosen because, unlike k-means, it does not require pre-specifying the number of clusters and can identify irregularly shaped groups as well as noise points. Conceptually, DBSCAN would be suitable for these data because collision patterns may form dense subgroups within particular combinations of road conditions. In practice, DBSCAN typically identifies a core cluster of densely populated authorities and flags a small number of authorities with unusual collision profiles as outliers. This provides a different perspective from k-means, which forces every authority into a cluster. In our dataset, DBSCAN identifies several small clusters alongside a noise group (labelled -1). This behaviour is typical when collision patterns form localised dense pockets rather than broad homogeneous groups.
+
+Alternatively, the clustering could be improved by increasing the number of variables used, such as adding road speed limits, pedestrian involvement or vehicle type proportions. Providing a richer representation of local authority risk profiles. Broader input variables would likely yield more nuanced clusters and enhance the interpretability of the results.
 
 
-
-## Record of AI use for MTHM503 unsupervised coursework
+## Record of AI Use for MTHM503 Unsupervised Coursework
 
 Instructions: You can use this document to record when, how and why you used GenAI to complete your assessment. It will help you create a record of AI use to submit alongside your references for AI-integrated and AI-assisted assignments. It may also be useful to help you discuss your AI use if you are required to do so in an academic conduct meeting.
 
-| **Date**       | **AI tool used** | **Purpose**                                | **Prompt**                                 | **Hyperlink to output (where possible)** | **Section of work used for** |
-|----------------|------------------|--------------------------------------------|--------------------------------------------|------------------------------------------|-------------------------------|
-| E.g. 15/07/2025| MS Copilot       | To help create an organised essay structure| ‘Generate ideas for structuring an essay on...’ | [insert link]                          | introduction                  |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-|                |                  |                                            |                                            |                                          |                               |
-
-
-
+| **Date** | **AI tool used** | **Purpose** | **Prompt** | **Section of work used for** |
+|----------|----------|----------------|--------------------|--------------------|
+| E.g. 15/07/2025 | MS Copilot | To help create an organised essay structure | ‘Generate ideas for structuring an essay on...’ | introduction |
+| 9/12/2025 | ChatGPT | Grammar and spell check | Please check my grammar and spelling. Feel free to reorder my sentence structure | Introduction, The Data, Hierarchical clustering, Kmeans clustering, Additional credit |
+| 9/12/2025 | ChatGPT | Code assisting | How to fit a DBSCAN model? | db = DBSCAN |
+| 9/12/2025 | ChatGPT | Debug | Error in my code, how to fix it? | DBSCAN |
+|  |  |  |  |  |
+|  |  |  |  |  |
+|  |  |  |  |  |

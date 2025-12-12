@@ -37,7 +37,7 @@ def hierarchical_groups(height):
 def _fit_dendrogram(df):
     """Given a dataframe containing only suitable values
     Return a scipy.cluster.hierarchy hierarchical clustering solution to these data"""
-    tree = linkage(df, method="ward")
+    tree = linkage(df, method="ward", metric='euclidean')
     return tree
 
 
